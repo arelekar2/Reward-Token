@@ -8,6 +8,7 @@ from web3 import Web3
 from smart_contract_dets import contractABI, contractAddress
 
 
+# ==================== Setup connection with the blockchain & contract ====================
 web3 = Web3(Web3.HTTPProvider("http://127.0.0.1:7545"))
 
 web3.eth.defaultAccount = web3.eth.accounts[0]
@@ -16,14 +17,17 @@ contract = web3.eth.contract(
     address=web3.toChecksumAddress(contractAddress), 
     abi=contractABI)
 
+
+# ==================== Set initial participants accounts ====================
 client1 = web3.eth.accounts[1]
 client2 = web3.eth.accounts[2]
 
 business1 = web3.eth.accounts[3]
 business2 = web3.eth.accounts[4]
 
-participants = [[],[],[]]
 
+
+# ==================== Setup app layout ====================
 app = Dash(external_stylesheets=[dbc.themes.BOOTSTRAP])
 
 app.layout = dbc.Container([
@@ -75,15 +79,7 @@ reg_form = dbc.Form([
     inline=True,
     style={'margin-bottom': '15px'}
     )
-
-def get_type(idx):
-    return {1:"CLIENT", 2:"BUSINESS"}.get(idx, 'NONE')
     
-bal_options = []
-def create_bal_options():
-    for i,l in enumerate(participants):
-        for addr in l:
-            bal_options.append({"label": addr +' ('+get_type(i)+')', "value": addr})
 
 balance_query_form = dbc.Form([
                         dbc.FormGroup([
@@ -200,11 +196,23 @@ tab3_content = dbc.Container([
                 , style={'margin-top': '15px'}),
                 ])
 
+
+
+
+# ==================== Callbacks for blockhain interactions ====================
+
 tab_contents = {
     'tab1' : tab1_content,
     'tab2' : tab2_content,
     'tab3' : tab3_content,
 }
+
+tab_to_desc = {
+    'tab1' : 'Total Reward Tokens issued',
+    'tab2' : "Total Reward Tokens earned",
+    'tab3' : "Total Reward Tokens collected",
+}
+
 
 @app.callback(
     [Output("card-content", "children"),
@@ -213,17 +221,8 @@ tab_contents = {
     [Input("tabs", "active_tab")]
 )
 def tab_content(active_tab):
-    tab_to_desc = {
-        'tab1' : 'Total Reward Tokens issued',
-        'tab2' : "Total Reward Tokens earned",
-        'tab3' : "Total Reward Tokens collected",
-    }
+    # func to get respective tab contents
 
-    # tab_to_balance = {
-    #     'tab1' : contract.functions.getTotalRewardsIssued().call(),
-    #     'tab2' : 0 if not participants[1] else contract.functions.getBalanceFor(participants[1][0]).call(),
-    #     'tab3' : 0 if not participants[2] else contract.functions.getBalanceFor(participants[2][0]).call(),
-    # }
     tab_to_balance = {
         'tab1' : contract.functions.getTotalRewardsIssued().call(),
         'tab2' : contract.functions.getBalanceFor(client1).call(),
@@ -232,17 +231,20 @@ def tab_content(active_tab):
     return tab_contents.get(active_tab), tab_to_desc.get(active_tab), tab_to_balance.get(active_tab)
 
 
+def get_type(idx):
+    return {1:"CLIENT", 2:"BUSINESS"}.get(idx, 'NONE')
+
 @app.callback(
     Output("reg_output", "children"), 
     [Input("reg_addr", "value"), Input("reg_dropdown", "value"), Input("reg_btn", 'n_clicks')])
 def register_particicpant(addr, _type, clicked):
+    # func to register new participants
     if addr and _type and clicked:
         try:
             tx_hash = contract.functions.registerParticipant(addr, _type).transact()
             web3.eth.waitForTransactionReceipt(tx_hash)
 
-            participants[_type].append(addr)
-            return f'Addr: {addr} has been added to the platform as a {"CLIENT" if _type == 1 else "BUSINESS" }'
+            return f'Addr: {addr} has been added to the platform as a {get_type(_type)}'
         except Exception as ex:
             return f'{ex}'
 
@@ -251,6 +253,7 @@ def register_particicpant(addr, _type, clicked):
     Output("bal_output", "children"), 
     [Input("bal_addr", "value"), Input("bal_btn", 'n_clicks')])
 def get_balance(addr, clicked):
+    # func to get balance of input addr
     if addr and clicked:
         try:
             bal = contract.functions.getBalanceFor(addr).call()
@@ -265,6 +268,7 @@ def get_balance(addr, clicked):
     Input("issue_amt", "value"), 
     Input("issue_btn", 'n_clicks')])
 def issue_rewards(addr, amt, clicked):
+    # func to issue reward tokens to given addr 
     if clicked:
         try:
             tx_hash = contract.functions.issueRewards(addr, int(amt)).transact()
@@ -278,6 +282,7 @@ def issue_rewards(addr, amt, clicked):
     Output('deal_output', 'children'), 
     [Input("deal_btn", 'n_clicks')])
 def deal_rewards(clicked):
+    # func to earn reward tokens based on deals
     if clicked:
         try:
             tx_hash = contract.functions.issueRewards(client1, 100).transact()
@@ -291,6 +296,7 @@ def deal_rewards(clicked):
     Output('redeem_output', 'children'), 
     [Input("redeem_btn", 'n_clicks')])
 def redeem_rewards(clicked):
+    # func to redeem offers for clients
     if clicked:
         try:
             web3.eth.defaultAccount = client1
@@ -310,6 +316,7 @@ def redeem_rewards(clicked):
     Input("transfer_amt", "value"), 
     Input("transfer_btn", 'n_clicks')])
 def share_rewards(addr, amt, clicked):
+    # func to transfer reward tokens among the participants
     if clicked:
         try:
             web3.eth.defaultAccount = client1
@@ -327,6 +334,7 @@ def share_rewards(addr, amt, clicked):
     Output('return_output', 'children'), 
     [Input("return_amt", "value"),Input("return_btn", 'n_clicks')])
 def return_rewards(amt, clicked):
+    # func to return the reward tokens back to the owner
     if clicked:
         try:
             web3.eth.defaultAccount = business1
@@ -341,6 +349,6 @@ def return_rewards(amt, clicked):
         
 
 
-# ------------------------------------------------------------------------------
+# ==================== Run the app server ====================
 if __name__ == '__main__':
     app.run_server(use_reloader=True)
