@@ -17,8 +17,10 @@ contract = web3.eth.contract(
     abi=contractABI)
 
 client1 = web3.eth.accounts[1]
+client2 = web3.eth.accounts[2]
 
-business1 = web3.eth.accounts[2]
+business1 = web3.eth.accounts[3]
+business2 = web3.eth.accounts[4]
 
 participants = [[],[],[]]
 
@@ -155,14 +157,14 @@ tab2_content = dbc.Container([
                 dbc.Card(
                     dbc.CardBody([
                         html.H4("Deals", style={'margin-bottom': '15px'}),
-                        dbc.Button("Buy Product X & earn 100 Reward Tokens", id='deal_btn', color="primary", size="sm",),
+                        dbc.Button("Buy Product X from Business1 & earn 100 Reward Tokens", id='deal_btn', color="primary", size="sm",),
                         html.P(id='deal_output'),
                         ])
                 , style={'margin-top': '15px'}),
                 dbc.Card(
                     dbc.CardBody([
                         html.H4("Redeem", style={'margin-bottom': '15px'}),
-                        dbc.Button("Redeem 5% discount for 100 RT", id='issue_btn', color="primary", size="sm"),
+                        dbc.Button("Redeem 5% discount from Business1 for 100 RT", id='redeem_btn', color="primary", size="sm"),
                         html.P(id='redeem_output'),
                         ])
                 , style={'margin-top': '15px'}),
@@ -171,7 +173,7 @@ tab2_content = dbc.Container([
                         html.H4("Transfer Reward Tokens", style={'margin-bottom': '15px'}),
                         transfer_form,
                         dbc.Button("Transfer", id='transfer_btn', color="primary", size="sm"),
-                        html.H4(id='transfer_output'),
+                        html.P(id='transfer_output'),
                         ])
                 , style={'margin-top': '15px'}),
                 ])
@@ -193,7 +195,7 @@ tab3_content = dbc.Container([
                         html.H4("Return Reward Tokens", style={'margin-bottom': '15px'}),
                         return_form,
                         dbc.Button("Return", id='return_btn', color="primary", size="sm"),
-                        html.H4(id='return_output'),
+                        html.P(id='return_output'),
                         ])
                 , style={'margin-top': '15px'}),
                 ])
@@ -224,8 +226,8 @@ def tab_content(active_tab):
     # }
     tab_to_balance = {
         'tab1' : contract.functions.getTotalRewardsIssued().call(),
-        'tab2' : 150,
-        'tab3' : 1260,
+        'tab2' : contract.functions.getBalanceFor(client1).call(),
+        'tab3' : contract.functions.getBalanceFor(business1).call(),
     }
     return tab_contents.get(active_tab), tab_to_desc.get(active_tab), tab_to_balance.get(active_tab)
 
@@ -271,6 +273,71 @@ def issue_rewards(addr, amt, clicked):
         except Exception as ex:
             return f'{ex}'
 
+
+@app.callback(
+    Output('deal_output', 'children'), 
+    [Input("deal_btn", 'n_clicks')])
+def deal_rewards(clicked):
+    if clicked:
+        try:
+            tx_hash = contract.functions.issueRewards(client1, 100).transact()
+            web3.eth.waitForTransactionReceipt(tx_hash)
+            return f'Earned 100 Reward Tokens!'
+        except Exception as ex:
+            return f'{ex}'
+
+
+@app.callback(
+    Output('redeem_output', 'children'), 
+    [Input("redeem_btn", 'n_clicks')])
+def redeem_rewards(clicked):
+    if clicked:
+        try:
+            web3.eth.defaultAccount = client1
+
+            tx_hash = contract.functions.transferP2P(business1, 100).transact()
+            web3.eth.waitForTransactionReceipt(tx_hash)
+
+            web3.eth.defaultAccount = web3.eth.accounts[0]
+            return f'Redeemed 100 Reward Tokens!'
+        except Exception as ex:
+            return f'{ex}'
+
+
+@app.callback(
+    Output("transfer_output", "children"), 
+    [Input("transfer_addr", "value"), 
+    Input("transfer_amt", "value"), 
+    Input("transfer_btn", 'n_clicks')])
+def share_rewards(addr, amt, clicked):
+    if clicked:
+        try:
+            web3.eth.defaultAccount = client1
+
+            tx_hash = contract.functions.transferP2P(addr, int(amt)).transact()
+            web3.eth.waitForTransactionReceipt(tx_hash)
+
+            web3.eth.defaultAccount = web3.eth.accounts[0]
+            return f'Shared {amt} Reward Tokens with {addr}!'
+        except Exception as ex:
+            return f'{ex}'
+
+
+@app.callback(
+    Output('return_output', 'children'), 
+    [Input("return_amt", "value"),Input("return_btn", 'n_clicks')])
+def return_rewards(amt, clicked):
+    if clicked:
+        try:
+            web3.eth.defaultAccount = business1
+
+            tx_hash = contract.functions.returnRewards(int(amt)).transact()
+            web3.eth.waitForTransactionReceipt(tx_hash)
+
+            web3.eth.defaultAccount = web3.eth.accounts[0]
+            return f'Returned {amt} Reward Tokens to Merchant!'
+        except Exception as ex:
+            return f'{ex}'
         
 
 
