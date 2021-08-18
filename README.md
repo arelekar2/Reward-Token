@@ -1,5 +1,5 @@
-# Reward-Token
-Blockchain + Smart Contract powered Loyalty Reward platform
+# RewardToken
+Blockchain based Multifunctional Token for Loyalty Programs
 
 ```
 Token name: RewardToken
@@ -16,7 +16,7 @@ Symbol: RT
 
 ## Steps to run the proj:
 1. Run Ganache
-2. Open Remix IDE in browser & Copy the contents of [RewardContract.sol](https://github.com/arelekar2/Reward-Token/blob/main/RewardContract.sol) to the IDE
+2. Open Remix IDE in browser & Copy the contents of [RewardContract.sol](https://github.com/arelekar2/Reward-Token/blob/main/RewardContract.sol) or [RewardContract2.sol](https://github.com/arelekar2/Reward-Token/blob/main/RewardContract2.sol) (has Staking) to the IDE
 3. Compile & Deploy the smart contract into the local blockchain on Remix IDE
 4. Copy the correct `Smart Contract Address` into the [smart_contract_dets.py](https://github.com/arelekar2/Reward-Token/blob/main/smart_contract_dets.py) file
 5. After successful deployment, run: `python3 init_participants.py` to intialize the participants in the loyalty reward blockchain
