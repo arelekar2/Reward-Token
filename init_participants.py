@@ -19,7 +19,7 @@ client1 = web3.eth.accounts[1]
 tx_hash = contract.functions.registerParticipant(client1, 1).transact()
 web3.eth.waitForTransactionReceipt(tx_hash)
 
-tx_hash = contract.functions.issueRewards(client1, 100).transact()
+tx_hash = contract.functions.issueTokens(client1, 100).transact()
 web3.eth.waitForTransactionReceipt(tx_hash)
 
 
@@ -28,7 +28,7 @@ client2 = web3.eth.accounts[2]
 tx_hash = contract.functions.registerParticipant(client2, 1).transact()
 web3.eth.waitForTransactionReceipt(tx_hash)
 
-tx_hash = contract.functions.issueRewards(client2, 200).transact()
+tx_hash = contract.functions.issueTokens(client2, 200).transact()
 web3.eth.waitForTransactionReceipt(tx_hash)
 
 
@@ -45,7 +45,7 @@ tx_hash = contract.functions.registerParticipant(business2, 2).transact()
 web3.eth.waitForTransactionReceipt(tx_hash)
 
 
-print(f'Total Reward Tokens issued: {contract.functions.getTotalRewardsIssued().call()}')
+print(f'Total RewardTokens issued: {contract.functions.getTotalTokensIssued().call()}')
 print(f'client1 Balance: {contract.functions.getBalanceFor(client1).call()}')
 print(f'client2 Balance: {contract.functions.getBalanceFor(client2).call()}')
 print(f'business1 Balance: {contract.functions.getBalanceFor(business1).call()}')
