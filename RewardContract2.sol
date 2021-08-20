@@ -1,61 +1,56 @@
+// SPDX-License-Identifier: UNLICENSED
 pragma solidity >=0.7.0 <0.9.0;
 
-import "openzeppelin-solidity/contracts/token/ERC20/ERC20.sol";
-import "openzeppelin-solidity/contracts/math/SafeMath.sol";
-import "openzeppelin-solidity/contracts/ownership/Ownable.sol";
+import "github.com/OpenZeppelin/openzeppelin-contracts/contracts/token/ERC20/ERC20.sol";
+import "github.com/OpenZeppelin/openzeppelin-contracts/contracts/utils/math/SafeMath.sol";
+import "github.com/OpenZeppelin/openzeppelin-contracts/contracts/access/Ownable.sol";
 
 contract RewardContract2 is ERC20, Ownable {
     using SafeMath for uint256;
 
     address private _owner;
-    uint256 public totalTokensIssued;
     
     enum ParticipantType {UNKNOWN, CLIENT, BUSINESS}
     
-    struct Participant {
-        uint balance;
-        ParticipantType pType;
-    }
-    
     // Map: addr -> participant data 
-    mapping(address => Participant) participants;
-    
-    
-    event Transfer(address indexed from, uint256 value, address indexed to);
+    mapping(address => ParticipantType) participants;
     
     
     // Set contract deployer as Owner
-    constructor() {
+    constructor() ERC20("RewardToken", "RT") {
         _owner = msg.sender;
-        _mint(_owner, 0);
+        _mint(_owner, 1000000);
     }
     
 
     // getter for contract owner
-    function getOwner() external pure returns (string memory) {
+    function getOwner() public view virtual returns (string memory) {
         return "MERCHANT X";
     }
     
     
     // ==================== Register participants ====================
     
+    // predicate to check if an address is a Participant or not
+    function isParticipant(address _addr) public view returns(bool) {
+        return participants[_addr] != ParticipantType.UNKNOWN;
+    }
+    
     // registering participant
-    function registerParticipant(address addr, ParticipantType _pType) public onlyOwner {
+    function registerParticipant(address _addr, ParticipantType _pType) public onlyOwner {
         // check if addr has not been already registered
-        require(participants[addr].pType == ParticipantType.UNKNOWN, "Particpant already exists in the platform!");
+        require(!isParticipant(_addr), "Particpant already exists in the platform!");
         
-        participants[addr].pType = _pType;
-        participants[addr].balance = 0;
+        participants[_addr] = _pType;
     }
     
     
     // unregistering participant
-    function unregisterParticipant(address addr) public onlyOwner {
+    function unregisterParticipant(address _addr) public onlyOwner {
         // check if addr has been already registered
-        require(participants[addr].pType != ParticipantType.UNKNOWN, "Addr is not part of the platform!");
+        require(isParticipant(_addr), "Addr is not part of the platform!");
         
-        participants[addr].pType = ParticipantType.UNKNOWN;
-        participants[addr].balance = 0;
+        participants[_addr] = ParticipantType.UNKNOWN;
     }
     
     
@@ -63,45 +58,36 @@ contract RewardContract2 is ERC20, Ownable {
     // ==================== Transfers ====================
     
     // owner-to-participant transfer
-    function issueTokens(address _toAddr, uint _amt) public onlyOwner {
+    function issueTokens(address _toAddr, uint256 _amt) public onlyOwner {
         // check if Receiver is a participant
-        require(participants[_toAddr].pType != ParticipantType.UNKNOWN, "Receiver is not a participant!");
+        require(isParticipant(_toAddr), "Receiver is not a participant!");
         
-        participants[_toAddr].balance += _amt;
-        totalTokensIssued += _amt;
-        
-        emit Transfer(_owner, _amt, _toAddr);
+        _mint(_toAddr, _amt);
     }
     
     
     // participant-to-participant transfer
-    function transferP2P(address _toAddr, uint _amt) public {
+    function transferP2P(address _toAddr, uint256 _amt) public {
         // check if Sender and Receiver are both participants
-        require(participants[msg.sender].pType != ParticipantType.UNKNOWN, "Sender is not a participant!");
-        require(participants[_toAddr].pType != ParticipantType.UNKNOWN, "Receiver is not a participant!");
+        require(isParticipant(msg.sender), "Sender is not a participant!");
+        require(isParticipant(_toAddr), "Receiver is not a participant!");
         
         // check if Sender has enough balance to transfer
-        require(participants[msg.sender].balance >= _amt, "Caller doesn't have enough balance!");
+        require(balanceOf(msg.sender) >= _amt, "Caller doesn't have enough balance!");
         
-        participants[msg.sender].balance -= _amt;
-        participants[_toAddr].balance += _amt;
-        
-        emit Transfer(msg.sender, _amt, _toAddr);
+        transfer(_toAddr, _amt);
     }
     
     
     // participant-to-owner transfer
-    function redeemTokens(uint _amt) public {
+    function redeemTokens(uint256 _amt) public {
         // check if Sender is a participant
-        require(participants[msg.sender].pType != ParticipantType.UNKNOWN, "Sender is not a participant!");
+        require(isParticipant(msg.sender), "Sender is not a participant!");
         
         // check if Sender has enough balance to transfer
-        require(participants[msg.sender].balance >= _amt, "Caller doesn't have enough balance!");
+        require(balanceOf(msg.sender) >= _amt, "Caller doesn't have enough balance!");
         
-        participants[msg.sender].balance -= _amt;
-        totalTokensIssued -= _amt;
-        
-        emit Transfer(msg.sender, _amt, _owner);
+        _burn(msg.sender, _amt);
     }
     
     
@@ -109,26 +95,26 @@ contract RewardContract2 is ERC20, Ownable {
     // ==================== Query balance ====================
     
     // Getter for any participant's balance
-    function getBalanceFor(address _addr) external onlyOwner view returns (uint) {
+    function getBalanceFor(address _addr) external onlyOwner view returns (uint256) {
         // check if given addr is a participant
-        require(participants[_addr].pType != ParticipantType.UNKNOWN, "Given address is not a participant!");
+        require(isParticipant(_addr), "Given address is not a participant!");
         
-        return participants[_addr].balance;
+        return balanceOf(_addr);
     }
     
     
     // Getter for self balance
-    function getSelfBalance() external view returns (uint) {
+    function getSelfBalance() external view returns (uint256) {
         // check if Caller is a participant
-        require(participants[msg.sender].pType != ParticipantType.UNKNOWN, "Caller is not a participant!");
+        require(isParticipant(msg.sender), "Caller is not a participant!");
         
-        return participants[msg.sender].balance;
+        return balanceOf(msg.sender);
     }
     
     
     // Getter for total RewardTokens issued
-    function getTotalTokensIssued() external onlyOwner view returns (uint) {
-        return totalTokensIssued;
+    function getTotalTokensIssued() external onlyOwner view returns (uint256) {
+        return totalSupply();
     }
 
 
@@ -160,10 +146,10 @@ contract RewardContract2 is ERC20, Ownable {
     // method to add an address as a stakeholder
     function addStakeholder(address _addr) public {
         // check if addr is already a member of blockchain
-        require(participants[addr].pType != ParticipantType.UNKNOWN, "Addr is not part of the platform!");
+        require(isParticipant(_addr), "Addr is not part of the platform!");
         
         if(!isStakeholder(_addr)) {
-            stakeholders.push(_stakeholder);
+            stakeholders.push(_addr);
             stakeholdersMap[_addr].idx = stakeholders.length - 1;
             stakeholdersMap[_addr].isStakeholder = true;
         }
@@ -173,7 +159,7 @@ contract RewardContract2 is ERC20, Ownable {
     // method to remove an address as a stakeholder
     function removeStakeholder(address _addr) public {
         // check if addr is already a member of blockchain
-        require(participants[addr].pType != ParticipantType.UNKNOWN, "Addr is not part of the platform!");
+        require(isParticipant(_addr), "Addr is not part of the platform!");
         
         if(isStakeholder(_addr)) {
             stakeholdersMap[_addr].isStakeholder = false;
@@ -208,7 +194,7 @@ contract RewardContract2 is ERC20, Ownable {
     function createStake(uint256 _stake) public {
         _burn(msg.sender, _stake);
         addStakeholder(msg.sender);
-        stakeholdersMap[msg.sender].stake.add(_stake);
+        stakeholdersMap[msg.sender].stake += _stake;
         _totalStakes += _stake;
         stakeholdersMap[msg.sender].startTimestamp = block.timestamp;
    }
@@ -219,7 +205,7 @@ contract RewardContract2 is ERC20, Ownable {
         // check if addr is already a stakeholder
         require(stakeholdersMap[msg.sender].isStakeholder, "Addr is not one of the Stakeholders!");
         
-        stakeholdersMap[msg.sender].stake.sub(_stake);
+        stakeholdersMap[msg.sender].stake -= _stake;
         removeStakeholder(msg.sender);
         _mint(msg.sender, _stake);
         _totalStakes -= _stake;
@@ -228,7 +214,7 @@ contract RewardContract2 is ERC20, Ownable {
     
     
     // === Regarding STAKING REWARDS ===
-    uint256 _stakeRewardrate = 36;
+    uint256 _stakeRewardRate = 36;
     uint256 _totalStakingRewards = 0;
 
 
@@ -248,7 +234,7 @@ contract RewardContract2 is ERC20, Ownable {
     function calculateStakingReward(address _addr) public view returns(uint256) {
         uint256 stake = stakeholdersMap[_addr].stake;
         uint256 daysDiff = (block.timestamp - stakeholdersMap[_addr].startTimestamp) / 86400;
-        return  stake * (_stakeRewardrate / 100) * (daysDiff / 365);
+        return  stake * (_stakeRewardRate / 100) * (daysDiff / 365);
     }
 
 
@@ -256,8 +242,9 @@ contract RewardContract2 is ERC20, Ownable {
     function distributeStakingRewards() public onlyOwner {
         for (uint256 s = 0; s < stakeholders.length; s += 1) {
             address stakeholder = stakeholders[s];
-            uint256 reward = calculateReward(stakeholder);
-            stakeholdersMap[stakeholder].reward.add(reward);
+            uint256 reward = calculateStakingReward(stakeholder);
+            stakeholdersMap[stakeholder].reward += reward;
+            _totalStakingRewards += reward;
         }
     }
 
@@ -266,6 +253,7 @@ contract RewardContract2 is ERC20, Ownable {
     function withdrawStakingRewards() public {
         uint256 reward = stakeholdersMap[msg.sender].reward;
         stakeholdersMap[msg.sender].reward = 0;
+        _totalStakingRewards -= reward;
         _mint(msg.sender, reward);
     }
 
