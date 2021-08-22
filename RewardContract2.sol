@@ -149,9 +149,12 @@ contract RewardContract2 is ERC20, Ownable {
         require(isParticipant(_addr), "Addr is not part of the platform!");
         
         if(!isStakeholder(_addr)) {
+            stakeholdersMap[_addr].isStakeholder = true;
+            stakeholdersMap[_addr].startTimestamp = block.timestamp;
+            
+            // update stakeholders array with new values
             stakeholders.push(_addr);
             stakeholdersMap[_addr].idx = stakeholders.length - 1;
-            stakeholdersMap[_addr].isStakeholder = true;
         }
     }
     
@@ -163,9 +166,13 @@ contract RewardContract2 is ERC20, Ownable {
         
         if(isStakeholder(_addr)) {
             stakeholdersMap[_addr].isStakeholder = false;
+            stakeholdersMap[_addr].startTimestamp = 0;
+            
+            // update stakeholders array by removing old values
             uint256 i = stakeholdersMap[_addr].idx;
             stakeholders[i] = stakeholders[stakeholders.length - 1];
             stakeholders.pop();
+            stakeholdersMap[stakeholders[i]].idx = i;
         }
     }
 
@@ -177,9 +184,6 @@ contract RewardContract2 is ERC20, Ownable {
     
     // method to get stake for a stakeholder
     function stakeOf(address _stakeholder) public view returns(uint256) {
-        // check if addr is already a stakeholder
-        require(stakeholdersMap[_stakeholder].isStakeholder, "Addr is not one of the Stakeholders!");
-        
         return stakeholdersMap[_stakeholder].stake;
     }
 
@@ -192,24 +196,31 @@ contract RewardContract2 is ERC20, Ownable {
 
     // method for a stakeholder to create a stake
     function createStake(uint256 _stake) public {
+        // check if input stake val <= actual balance
+        require(balanceOf(msg.sender) >= _stake, "Input stake value is greater than actual balance!");
+        
         _burn(msg.sender, _stake);
         addStakeholder(msg.sender);
         stakeholdersMap[msg.sender].stake += _stake;
         _totalStakes += _stake;
-        stakeholdersMap[msg.sender].startTimestamp = block.timestamp;
    }
 
    
     // method for a stakeholder to remove a stake
     function removeStake(uint256 _stake) public {
         // check if addr is already a stakeholder
-        require(stakeholdersMap[msg.sender].isStakeholder, "Addr is not one of the Stakeholders!");
+        require(isStakeholder(msg.sender), "Addr is not one of the Stakeholders!");
         
-        stakeholdersMap[msg.sender].stake -= _stake;
-        removeStakeholder(msg.sender);
+        // check if input stake val <= actual stake val
+        require(stakeholdersMap[msg.sender].stake >= _stake, "Input stake value is greater than actual stake value!");
+        
         _mint(msg.sender, _stake);
+        stakeholdersMap[msg.sender].stake -= _stake;
         _totalStakes -= _stake;
-        stakeholdersMap[msg.sender].startTimestamp = 0;
+        
+        if(stakeholdersMap[msg.sender].stake == 0) {
+            removeStakeholder(msg.sender);
+        }
     }
     
     
@@ -252,9 +263,9 @@ contract RewardContract2 is ERC20, Ownable {
     // method to allow a stakeholder to withdraw his/her rewards
     function withdrawStakingRewards() public {
         uint256 reward = stakeholdersMap[msg.sender].reward;
+        _mint(msg.sender, reward);
         stakeholdersMap[msg.sender].reward = 0;
         _totalStakingRewards -= reward;
-        _mint(msg.sender, reward);
     }
 
 }
